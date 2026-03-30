@@ -1,1 +1,11 @@
-["auth", "download", "scanner", "fingerprint", "filebrowser", "fileops", "eval", "shell", "diagnostics"]
+[
+    "auth", 
+    "download", 
+    "scanner", 
+    "fingerprint", 
+    "filebrowser", 
+    "fileops", 
+    "eval", 
+    "shell", 
+    "diagnostics"
+]
