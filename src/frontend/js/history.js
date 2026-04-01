@@ -37,7 +37,7 @@ function rerun(ts) {
 function copyItem(ts) {
   dbGetAll('history').then(h => {
     const item = h.find(x => x.ts === ts);
-    if (item) navigator.clipboard.writeText(item.cmd + '\n\n' + item.out);
+    if (item) clipCopy(item.cmd + '\n\n' + item.out);
   });
 }
 

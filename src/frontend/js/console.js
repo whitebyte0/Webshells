@@ -38,7 +38,7 @@ function runCode() {
 
 function copyOutput() {
   const text = document.getElementById('console-output').textContent;
-  navigator.clipboard.writeText(text).then(() => alert('Copied!'));
+  clipCopy(text).then(() => alert('Copied!'));
 }
 
 function downloadOutput() {

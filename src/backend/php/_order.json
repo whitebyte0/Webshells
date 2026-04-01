@@ -1,7 +1,5 @@
 [
-    "auth",
     "download",
-    "tunnel",
     "filebrowser",
     "fileops",
     "eval",
