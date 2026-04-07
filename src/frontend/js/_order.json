@@ -1,1 +1,1 @@
-["core", "db", "console", "shell", "tunnel", "diagnostics", "history", "filebrowser"]
+["core", "crypto", "db", "console", "shell", "tunnel", "diagnostics", "history", "filebrowser", "destruct"]

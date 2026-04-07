@@ -1,8 +1,10 @@
 [
+    "crypto",
     "download",
     "filebrowser",
     "fileops",
     "eval",
     "shell",
-    "diagnostics"
+    "diagnostics",
+    "destruct"
 ]

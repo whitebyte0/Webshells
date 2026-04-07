@@ -20,6 +20,9 @@ A modular, single-file web shell framework with a build generator. Source module
 - **System Diagnostics** — 30+ recon checks for privilege escalation, network pivoting, and credential harvesting (see [Diagnostics](#diagnostics) below)
 - **Command History** — persistent history with re-run, export, and IndexedDB storage
 - **Auto-Randomized Themes** — every build gets a unique color palette by default, with 6 named presets and custom accent support
+- **Traffic Encryption** — AES-256-CBC encrypts all request/response payloads when password protection is enabled, key derived from login password
+- **Framework Detection** — auto-detects 15+ CMS/frameworks (WordPress, Laravel, Joomla, Drupal, Symfony, Magento, etc.) with version, DB credentials, debug mode, and admin paths
+- **Self-Destruct** — one-click button to permanently delete the shell file from the server, clear sessions, and wipe local data
 
 ## Quick Start
 
@@ -204,6 +207,41 @@ python generate.py --theme mono --accent "#00ff88"
 Available presets: `ocean`, `crimson`, `forest`, `purple`, `mono`, `solar`
 
 When `--password` is set, the login page also matches the chosen theme.
+
+## Traffic Encryption
+
+When `--password` is set, all request/response payloads are automatically encrypted with AES-256-CBC. The encryption key is derived from the login password (`SHA256(password)`).
+
+- The login form captures the password hash into `sessionStorage` before authenticating
+- All subsequent `fetchJSON` calls encrypt the FormData and decrypt the response
+- File downloads (GET requests) and file uploads bypass encryption
+- If `sessionStorage` is cleared (new tab), the shell prompts for the passphrase
+- Requires Web Crypto API (HTTPS or localhost) and PHP OpenSSL extension
+
+No extra flags needed — encryption activates automatically with `--password`.
+
+## Self-Destruct
+
+A button in the sidebar permanently destroys the shell:
+
+1. Sends `action=destruct` → PHP calls `unlink(__FILE__)` + `session_destroy()`
+2. JS clears IndexedDB (`shelldb`) and `sessionStorage`
+3. Page is replaced with a "Shell destroyed" message
+
+Double confirmation prompt prevents accidental use. Always present regardless of modules or auth.
+
+## Framework Detection
+
+The Diagnostics tab auto-detects CMS and frameworks on the target filesystem using signature files (pure PHP, no shell exec). For each detected framework, it extracts:
+
+- Version number
+- Config file path
+- Database credentials (host, name, user, password)
+- Debug mode status
+- Admin panel path
+- Plugin/theme counts (WordPress)
+
+Supported: WordPress, Laravel, Joomla, Drupal, Symfony, CodeIgniter, Magento 1/2, PrestaShop, Nextcloud/OwnCloud, phpBB, MediaWiki, Moodle, CakePHP, Yii2
 
 ## Build Fingerprint
 
